@@ -38,8 +38,18 @@ def load_funsd_doc(stem: str):
             boxes.append(word["box"])
             labels.append(label)
 
+    boxes = [normalize_box(box, image.width, image.height) for box in boxes]
+    
     return image, words, boxes, labels
 
+def normalize_box(box, width, height):
+    """Scale a [x0,y0,x1,y1] pixel box to LayoutLMv3's expected 0-1000 range."""
+    return [
+        int(1000 * box[0] / width),
+        int(1000 * box[1] / height),
+        int(1000 * box[2] / width),
+        int(1000 * box[3] / height),
+    ]
 
 if __name__ == "__main__":
     stem = "0000971160"
