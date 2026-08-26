@@ -1,0 +1,6 @@
+pandas
+json
+statistics
+pathlib
+PIL
+pytesseract
