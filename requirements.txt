@@ -5,3 +5,5 @@ pathlib
 PIL
 pytesseract
 transformers
+seqeval
+accelerate>=1.1.0
