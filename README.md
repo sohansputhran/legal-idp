@@ -45,12 +45,30 @@ Tesseract-based OCR baseline, run directly on raw images with no dependency on F
 **Note:** word-count parity between OCR output and ground truth is not sufficient for validation, since detected words aren't index-aligned across the two sources (different words at the same list position). Formal evaluation will require IoU-based box matching or text-content matching with position tolerance.
 
 ### `layoutlm_pipeline.py`
-In progress — LayoutLMv3 fine-tuning for token classification (entity labeling) on FUNSD.
+LayoutLMv3 (base) fine-tuned for token classification on FUNSD.
+
+- **Preprocessing:** `LayoutLMv3Processor` (`apply_ocr=False`, using FUNSD's own words/boxes). Boxes normalized to the 0–1000 scale manually (`normalize_box` in `data_utils.py`) — the processor does **not** do this automatically when `apply_ocr=False`, a gotcha caught by inspecting raw output boxes before training.
+- **Split:** 127 train / 22 val, carved out of the 149 official training docs (fixed seed, reproducible). FUNSD's official 50-doc test set is untouched, reserved for final reporting.
+- **Training:** batch size 2, gradient accumulation ×4 (effective batch 8), fp16, 10 epochs, on a single RTX 2060 (6GB VRAM).
+- **Metrics:** token-level `sklearn` classification report — not `seqeval`, since FUNSD's labels (`question`/`answer`/`header`/`other`) are flat token classes, not BIO-tagged entity spans (seqeval assumes BIO and silently misbehaves on flat labels, confirmed via `UserWarning: ... seems not to be NE tag`).
+
+**Results (val set, 22 docs):**
+
+| Label | Precision | Recall | F1 | Support |
+|---|---|---|---|---|
+| answer | 0.78 | 0.93 | 0.85 | 1336 |
+| header | 0.81 | 0.48 | 0.60 | 257 |
+| other | 0.72 | 0.49 | 0.58 | 597 |
+| question | 0.86 | 0.89 | 0.87 | 1030 |
+| **macro avg** | 0.79 | 0.70 | **0.73** | 3220 |
+| weighted avg | 0.80 | 0.80 | 0.79 | 3220 |
+
+Majority classes (`question`, `answer`) perform well. `header` and `other` lag on recall — `header` likely confused with visually/positionally similar `question` fields; `other` is a catch-all class the model under-identifies. Macro F1 0.73 is the headline number (weights all classes equally, exposing minority-class weakness that micro/weighted F1 would mask).
 
 ## Next steps
 
-- [ ] Build LayoutLMv3 preprocessing (box normalization to 0–1000 scale, processor setup)
-- [ ] Fine-tune LayoutLMv3 on FUNSD, evaluate token-level F1
+- [x] Build LayoutLMv3 preprocessing (box normalization to 0–1000 scale, processor setup)
+- [x] Fine-tune LayoutLMv3 on FUNSD, evaluate token-level F1
 - [ ] Build Donut baseline (OCR-free image→JSON) for comparison
 - [ ] Formal OCR-baseline evaluation (IoU-matched word accuracy)
 - [ ] Repeat pipeline on FIR dataset (real-world Indian legal documents)
