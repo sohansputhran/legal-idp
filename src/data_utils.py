@@ -90,6 +90,16 @@ def extract_qa_pairs(stem: str):
 
     return qa_pairs
 
+def pairs_to_donut_target(qa_pairs: dict) -> str:
+    """
+    Serialize question->answer pairs into Donut's tag-based target format.
+    e.g. {"Date:": "9/3/92"} -> "<s_question>Date:</s_question><s_answer>9/3/92</s_answer>"
+    """
+    parts = []
+    for question, answer in qa_pairs.items():
+        parts.append(f"<s_question>{question}</s_question><s_answer>{answer}</s_answer>")
+    return "".join(parts)
+
 if __name__ == "__main__":
     stem = "0000971160"
     # stem = next(ANN_DIR.glob("*.json")).stem
@@ -99,5 +109,7 @@ if __name__ == "__main__":
     print("First 5:", list(zip(words[:5], boxes[:5], labels[:5])))
 
     pairs = extract_qa_pairs(stem)
-    for q, a in pairs.items():
-        print(f"{q!r} -> {a!r}")
+    # for q, a in pairs.items():
+    #     print(f"{q!r} -> {a!r}")
+    target = pairs_to_donut_target(pairs)
+    print(target)
