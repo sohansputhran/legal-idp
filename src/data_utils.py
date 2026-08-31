@@ -51,6 +51,55 @@ def normalize_box(box, width, height):
         int(1000 * box[3] / height),
     ]
 
+def extract_qa_pairs(stem: str):
+    """
+    Extract question -> answer text pairs from one FUNSD document,
+    using the 'linking' field to resolve which answer belongs to which question.
+    """
+    ann_path = ANN_DIR / f"{stem}.json"
+    with open(ann_path, encoding="utf-8") as f:
+        data = json.load(f)
+
+    # Step 1: build an id -> entry lookup so we can resolve linked ids
+    # back to their actual entries (text, label) in O(1)
+    entries_by_id = {entry["id"]: entry for entry in data["form"]}
+
+    qa_pairs = {}
+
+    # Step 2: walk every entry that's labeled a question
+    for entry in data["form"]:
+        if entry["label"] != "question":
+            continue
+
+        question_text = entry["text"]
+
+        # Step 3: check its links - each link is a [id_a, id_b] pair.
+        # One of the two ids is this question's own id; the other is
+        # whatever it's connected to (usually an answer).
+        for link in entry["linking"]:
+            other_id = link[0] if link[1] == entry["id"] else link[1]
+
+            linked_entry = entries_by_id.get(other_id)
+            if linked_entry is None:
+                continue  # defensive - shouldn't happen, but linking data can be messy
+
+            # Step 4: only keep it if the linked entry is actually an answer
+            # (a question can link to a header or another question in some docs)
+            if linked_entry["label"] == "answer":
+                qa_pairs[question_text] = linked_entry["text"]
+
+    return qa_pairs
+
+def pairs_to_donut_target(qa_pairs: dict) -> str:
+    """
+    Serialize question->answer pairs into Donut's tag-based target format.
+    e.g. {"Date:": "9/3/92"} -> "<s_question>Date:</s_question><s_answer>9/3/92</s_answer>"
+    """
+    parts = []
+    for question, answer in qa_pairs.items():
+        parts.append(f"<s_question>{question}</s_question><s_answer>{answer}</s_answer>")
+    return "".join(parts)
+
 if __name__ == "__main__":
     stem = "0000971160"
     # stem = next(ANN_DIR.glob("*.json")).stem
@@ -58,3 +107,9 @@ if __name__ == "__main__":
     print(f"Image size: {image.size}")
     print(f"Num words: {len(words)}")
     print("First 5:", list(zip(words[:5], boxes[:5], labels[:5])))
+
+    pairs = extract_qa_pairs(stem)
+    # for q, a in pairs.items():
+    #     print(f"{q!r} -> {a!r}")
+    target = pairs_to_donut_target(pairs)
+    print(target)
